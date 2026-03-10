@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  email          String        @unique
+  password       String
+  name           String
+  role           String        // ADMIN, GIVER, RECEIVER
+  availableAmount Float        @default(0)
+  preferredRate  Float         @default(0)
+  
+  // Relations
+  givenRequests  LoanRequest[] @relation("GiverRequests")
+  receivedRequests LoanRequest[] @relation("ReceiverRequests")
+  givenDeals     LoanDeal[]    @relation("GiverDeals")
+  receivedDeals  LoanDeal[]    @relation("ReceiverDeals")
+  notifications  Notification[]
+}
+
+model LoanRequest {
+  id           Int       @id @default(autoincrement())
+  receiverId   Int
+  giverId      Int?      // Optional: if it's a directed request
+  amount       Float
+  proposedRate Float
+  preferredTenureMonths Int @default(12)
+  status       String    // PENDING_ADMIN_APPROVAL, PENDING, GIVER_ACCEPTED, COMPLETED, REJECTED
+  
+  // Pending Giver Terms (waiting for Admin)
+  finalTenureMonths Int?
+  finalRepaymentDay Int?
+
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  receiver     User      @relation("ReceiverRequests", fields: [receiverId], references: [id])
+  giver        User?     @relation("GiverRequests", fields: [giverId], references: [id])
+  deal         LoanDeal?
+}
+
+model LoanDeal {
+  id            Int       @id @default(autoincrement())
+  requestId     Int       @unique
+  giverId       Int
+  receiverId    Int
+  principal     Float
+  interestRate  Float
+  tenureMonths  Int
+  repaymentDayOfMonth Int @default(10)
+  status        String    // ACTIVE, COMPLETED, DEFAULTED
+  startDate     DateTime  @default(now())
+
+  // Relations
+  request       LoanRequest @relation(fields: [requestId], references: [id])
+  giver         User        @relation("GiverDeals", fields: [giverId], references: [id])
+  receiver      User        @relation("ReceiverDeals", fields: [receiverId], references: [id])
+  payments      Payment[]
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  dealId    Int
+  date      DateTime @default(now())
+  amount    Float
+  type      String   // EMI, EXTRA
+
+  deal      LoanDeal @relation(fields: [dealId], references: [id])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
